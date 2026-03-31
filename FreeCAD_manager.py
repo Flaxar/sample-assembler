@@ -3,6 +3,11 @@ import sys
 ## ---------------- FreeCAD IMPORT --------------------
 
 # Define your FreeCAD paths (using 'r' before the string handles the Windows backslashes)
+# NOTEBOOK
+# freecad_bin_path = r"C:\Program Files\FreeCAD 1.1\bin"
+# freecad_lib_path = r"C:\Program Files\FreeCAD 1.1\bin\Lib"
+
+# PC
 freecad_bin_path = r"C:\Program Files\FreeCAD 1.1\bin"
 freecad_lib_path = r"C:\Program Files\FreeCAD 1.1\bin\Lib"
 

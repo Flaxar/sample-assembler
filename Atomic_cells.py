@@ -1,45 +1,61 @@
 import numpy as np
+from enum import Enum
+import math
 try:
     import FreeCAD
     import Part
 except ImportError as e:
     print(f"IMPORT: Exception {e}")
 
-class Atomic_cell:
-    def __init__(self, type):
-        pass
+#     radius = 5.0
+#     height = 10.0
+#     polygon_points = []
+#     for i in range(7):  # 7 points to close the loop back at the start
+#         angle = math.radians(60 * i)
+#         polygon_points.append(FreeCAD.Vector(radius * math.cos(angle), radius * math.sin(angle), 0))
+#
+#     hex_wire = Part.makePolygon(polygon_points)
+#     hex_face = Part.Face(hex_wire)
+#     atomic_cell = hex_face.extrude(FreeCAD.Vector(0, 0, height))
+
+# class AtomicCellType(Enum):
+#     BCC = 1
+#     FCC = 2
+
+class AtomicCell:
+    def __init__(self):
+        # self.atomic_cell_type = atomic_cell_type
+        self.atoms = []
+        self.step_x = 0
+        self.step_y = 0
+        self.step_z = 0
+
+    def generate_BCC(self, side_length):
+        self.atoms = [
+            (0, 0, 0),
+            (side_length / 2, side_length / 2, side_length / 2),
+        ]
+
+        self.step_x = side_length
+        self.step_y = side_length
+        self.step_z = side_length
 
 
 
-    def fill_volume_with_lattice(self, target_shape, atomic_cell, step_x, step_y, step_z):
-        """
-        Fills a target shape with a repeated atomic cell.
-        """
-        bbox = target_shape.BoundBox
-        cells = []
 
-        print(f"Target Bounding Box: X[{bbox.XMin:.2f}, {bbox.XMax:.2f}], "
-              f"Y[{bbox.YMin:.2f}, {bbox.YMax:.2f}], Z[{bbox.ZMin:.2f}, {bbox.ZMax:.2f}]")
 
-        # Generate the grid. We use a small buffer to ensure the very edges aren't missed.
-        x = bbox.XMin
-        while x <= (bbox.XMax + step_x):
-            y = bbox.YMin
-            while y <= (bbox.YMax + step_y):
-                z = bbox.ZMin
-                while z <= (bbox.ZMax + step_z):
-                    # Copy the base cell and move it to the current coordinate
-                    cell_copy = atomic_cell.copy()
-                    cell_copy.translate(FreeCAD.Vector(x, y, z))
-                    cells.append(cell_copy)
-                    z += step_z
-                y += step_y
-            x += step_x
 
-        print(f"Generated {len(cells)} atomic cells. Performing boolean intersection...")
-
-        # Combine all cells into one compound, then intersect with the target shape
-        lattice_compound = Part.makeCompound(cells)
-        filled_shape = target_shape.common(lattice_compound)
-
-        return filled_shape
+# def generate_square_atomic_cell(side_len):
+#     return Part.makeBox(side_len, side_len, side_len)
+#
+#
+#
+# def generate_hexagonal_atomic_cell(radius, height):
+#     polygon_points = []
+#     for i in range(7):  # 7 points to close the loop back at the start
+#         angle = math.radians(60 * i)
+#         polygon_points.append(FreeCAD.Vector(radius * math.cos(angle), radius * math.sin(angle), 0))
+#
+#     hex_wire = Part.makePolygon(polygon_points)
+#     hex_face = Part.Face(hex_wire)
+#     return hex_face.extrude(FreeCAD.Vector(0, 0, height))

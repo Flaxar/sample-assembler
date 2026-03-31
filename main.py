@@ -10,69 +10,67 @@ except ImportError as e:
     print(f"IMPORT: Failed to import FreeCAD: {e}")
 
 
-def fill_volume_with_lattice(target_shape, atomic_cell, step_x, step_y, step_z):
-    """
-    Fills a target shape with a repeated atomic cell.
-    """
-    bbox = target_shape.BoundBox
-    cells = []
 
-    print(f"Target Bounding Box: X[{bbox.XMin:.2f}, {bbox.XMax:.2f}], "
+def export_lattice_to_txt(target_shape, cell: atc.AtomicCell, output_path: str):
+    """
+    Takes unit cell data, tiles it across the target shape's bounding box,
+    filters out points outside the shape, and exports to a text file.
+    """
+    base_atoms = cell.atoms
+    step_x = cell.step_x
+    step_y = cell.step_y
+    step_z = cell.step_z
+
+    bbox = target_shape.BoundBox
+
+    # Using a set automatically prevents duplicate coordinates from being recorded
+    # if cell boundaries perfectly overlap during tiling.
+    valid_points = set()
+
+    print(f"Scanning Bounding Box: X[{bbox.XMin:.2f}, {bbox.XMax:.2f}], "
           f"Y[{bbox.YMin:.2f}, {bbox.YMax:.2f}], Z[{bbox.ZMin:.2f}, {bbox.ZMax:.2f}]")
 
-    # Generate the grid. We use a small buffer to ensure the very edges aren't missed.
-    x = bbox.XMin
-    while x <= (bbox.XMax + step_x):
-        y = bbox.YMin
-        while y <= (bbox.YMax + step_y):
-            z = bbox.ZMin
-            while z <= (bbox.ZMax + step_z):
-                # Copy the base cell and move it to the current coordinate
-                cell_copy = atomic_cell.copy()
-                cell_copy.translate(FreeCAD.Vector(x, y, z))
-                cells.append(cell_copy)
+    x = bbox.XMin - (bbox.XMin % step_x)
+    while x <= bbox.XMax + step_x:
+        y = bbox.YMin - (bbox.YMin % step_y)
+        while y <= bbox.YMax + step_y:
+            z = bbox.ZMin - (bbox.ZMin % step_z)
+            while z <= bbox.ZMax + step_z:
+
+                # Iterate through all atoms defined in our unit cell
+                for (ax, ay, az) in base_atoms:
+                    # Translate the base atom to the current grid location
+                    pt = FreeCAD.Vector(x + ax, y + ay, z + az)
+
+                    # Check if the translated point is inside the target shape
+                    if target_shape.isInside(pt, 1e-6, True):
+                        # Round to 9 decimal places to ensure clean deduplication in the set
+                        valid_points.add((round(pt.x, 9), round(pt.y, 9), round(pt.z, 9)))
+
                 z += step_z
             y += step_y
         x += step_x
 
-    print(f"Generated {len(cells)} atomic cells. Performing boolean intersection...")
 
-    # Combine all cells into one compound, then intersect with the target shape
-    lattice_compound = Part.makeCompound(cells)
-    filled_shape = target_shape.common(lattice_compound)
+    atom_count = len(valid_points)
+    print(f"Found {atom_count} atoms inside the shape. Writing to file...")
 
-    return filled_shape
+    # Write the deduplicated points to the text file
+    with open(output_path, 'w') as file:
+        file.write(f"{atom_count}\n\n")
+        for point in valid_points:
+            file.write(f"H {point[0]:.9f}   {point[1]:.9f}   {point[2]:.9f}\n")
 
-
+    print(f"Successfully exported coordinates to: {output_path}")
 
 if __name__ == '__main__':
-    target_shape = cm.import_part_shape(r"C:\Programming\VUT\Sample assembler\test_object.step")
+    target_shape = cm.import_part_shape(r"E:\Programming\VUT\sample-assembler\test_object.step")
 
-    radius = 5.0
-    height = 10.0
-    polygon_points = []
-    for i in range(7):  # 7 points to close the loop back at the start
-        angle = math.radians(60 * i)
-        polygon_points.append(FreeCAD.Vector(radius * math.cos(angle), radius * math.sin(angle), 0))
-
-    hex_wire = Part.makePolygon(polygon_points)
-    hex_face = Part.Face(hex_wire)
-    atomic_cell = hex_face.extrude(FreeCAD.Vector(0, 0, height))
-
-    # 3. Define the step sizes for the grid
-    # For hexagons to touch point-to-point in a simple grid (not staggered):
-    dx = radius * 2.0
-    dy = radius * math.sqrt(3)
-    dz = height
+    bcc_cell = atc.AtomicCell()
+    bcc_cell.generate_BCC(side_length = 3)
 
     try:
-        filled_result = fill_volume_with_lattice(target_shape, atomic_cell, dx, dy, dz)
-        print(f"Successfully created filled shape with volume: {filled_result.Volume:.2f}")
-
-        # 5. Export the final result directly to a new STEP file
-        output_path = r"C:\path\to\your\FilledModel.step"
-        filled_result.exportStep(output_path)
-        print(f"Saved filled model to: {output_path}")
+        export_lattice_to_txt(target_shape, bcc_cell, "bcc_test.xyz")
 
     except Exception as e:
         print(f"An error occurred during lattice generation: {e}")
