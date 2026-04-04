@@ -39,6 +39,20 @@ class AtomicCell:
         self.step_x = side_length
         self.step_y = side_length
         self.step_z = side_length
+        return
+
+    def generate_FCC(self, side_length):
+        self.atoms = [
+            (0, 0, 0),
+            (0, side_length / 2, side_length / 2),
+            (side_length / 2, 0, side_length / 2),
+            (side_length / 2, side_length / 2, 0),
+        ]
+
+        self.step_x = side_length
+        self.step_y = side_length
+        self.step_z = side_length
+        return
 
 
 

@@ -64,10 +64,13 @@ def export_lattice_to_txt(target_shape, cell: atc.AtomicCell, output_path: str):
     print(f"Successfully exported coordinates to: {output_path}")
 
 if __name__ == '__main__':
-    target_shape = cm.import_part_shape(r"E:\Programming\VUT\sample-assembler\test_object.step")
+    target_shape = cm.import_part_shape(r"E:\Programming\VUT\sample-assembler\test.step")
+
+    # bcc_cell = atc.AtomicCell()
+    # bcc_cell.generate_BCC(side_length = 3)
 
     bcc_cell = atc.AtomicCell()
-    bcc_cell.generate_BCC(side_length = 3)
+    bcc_cell.generate_BCC(side_length=3)
 
     try:
         export_lattice_to_txt(target_shape, bcc_cell, "bcc_test.xyz")
