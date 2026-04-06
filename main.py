@@ -16,7 +16,7 @@ def export_lattice_to_txt(target_shape, cell: atc.AtomicCell, output_path: str):
     Takes unit cell data, tiles it across the target shape's bounding box,
     filters out points outside the shape, and exports to a text file.
     """
-    base_atoms = cell.atoms
+    base_atoms = cell.atom_pos
     step_x = cell.step_x
     step_y = cell.step_y
     step_z = cell.step_z
@@ -38,14 +38,14 @@ def export_lattice_to_txt(target_shape, cell: atc.AtomicCell, output_path: str):
             while z <= bbox.ZMax + step_z:
 
                 # Iterate through all atoms defined in our unit cell
-                for (ax, ay, az) in base_atoms:
+                for index, (ax, ay, az) in enumerate(base_atoms):
                     # Translate the base atom to the current grid location
                     pt = FreeCAD.Vector(x + ax, y + ay, z + az)
 
                     # Check if the translated point is inside the target shape
                     if target_shape.isInside(pt, 1e-6, True):
                         # Round to 9 decimal places to ensure clean deduplication in the set
-                        valid_points.add((round(pt.x, 9), round(pt.y, 9), round(pt.z, 9)))
+                        valid_points.add((cell.atom_elem[index], round(pt.x, 9), round(pt.y, 9), round(pt.z, 9)))
 
                 z += step_z
             y += step_y
@@ -55,25 +55,25 @@ def export_lattice_to_txt(target_shape, cell: atc.AtomicCell, output_path: str):
     atom_count = len(valid_points)
     print(f"Found {atom_count} atoms inside the shape. Writing to file...")
 
-    # Write the deduplicated points to the text file
+    # Write the unique points to the text file
     with open(output_path, 'w') as file:
         file.write(f"{atom_count}\n\n")
         for point in valid_points:
-            file.write(f"H {point[0]:.9f}   {point[1]:.9f}   {point[2]:.9f}\n")
+            file.write(f"{point[0][1]} {point[1]:.9f}   {point[2]:.9f}   {point[3]:.9f}\n")
 
     print(f"Successfully exported coordinates to: {output_path}")
 
 if __name__ == '__main__':
-    target_shape = cm.import_part_shape(r"E:\Programming\VUT\sample-assembler\test.step")
+    target_shape = cm.import_part_shape(r"E:\Programming\VUT\sample-assembler\test_object.step")
 
-    # bcc_cell = atc.AtomicCell()
-    # bcc_cell.generate_BCC(side_length = 3)
+    # bcc_cell = atc.BCC_Cell(3)
+    # bcc_cell.set_atoms(atc.Atoms.hydrogen, atc.Atoms.helium)
 
-    bcc_cell = atc.AtomicCell()
-    bcc_cell.generate_BCC(side_length=3)
+    fcc_cell = atc.FCC_Cell(3)
+    fcc_cell.set_atoms(atc.Atoms.helium, atc.Atoms.hydrogen)
 
     try:
-        export_lattice_to_txt(target_shape, bcc_cell, "bcc_test.xyz")
+        export_lattice_to_txt(target_shape, fcc_cell, "fcc_test.xyz")
 
     except Exception as e:
         print(f"An error occurred during lattice generation: {e}")
