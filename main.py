@@ -69,11 +69,11 @@ if __name__ == '__main__':
     # bcc_cell = atc.BCC_Cell(3)
     # bcc_cell.set_atoms(atc.Atoms.hydrogen, atc.Atoms.helium)
 
-    fcc_cell = atc.FCC_Cell(3)
-    fcc_cell.set_atoms(atc.Atoms.helium, atc.Atoms.hydrogen)
+    hcp_cell = atc.HCP_Cell(3)
+    hcp_cell.set_atoms(atc.Atoms.helium, atc.Atoms.hydrogen)
 
     try:
-        export_lattice_to_txt(target_shape, fcc_cell, "fcc_test.xyz")
+        export_lattice_to_txt(target_shape, hcp_cell, "hcp_test.xyz")
 
     except Exception as e:
         print(f"An error occurred during lattice generation: {e}")
