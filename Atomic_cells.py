@@ -10,6 +10,7 @@ except ImportError as e:
 class Atoms:
     hydrogen = (1, "H")
     helium = (2, "He")
+    carbon = (6, "C")
 
 
 class AtomicCell:

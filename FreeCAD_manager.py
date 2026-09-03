@@ -40,6 +40,27 @@ def import_part_shape(file_path):
         return
     return new_shape
 
+def import_multi_body_step(filepath):
+    """Imports a STEP file and returns a list of individual solid shapes."""
+    try:
+        doc = FreeCAD.newDocument("TempDoc")
+        Import.insert(filepath, doc.Name)
+        shapes_dict = {}
+        # Loop through the imported objects and grab their Label (Name) and Shape
+        for obj in doc.Objects:
+            # Fusion sometimes imports compound groups, we only want the actual solid shapes
+            if hasattr(obj, "Shape") and not obj.Shape.isNull() and obj.Shape.Volume > 0:
+                if "(Unsaved)" not in obj.Label:
+                    shapes_dict[obj.Label] = obj.Shape
+                    print(f"Found part named: {obj.Label}")
+        return shapes_dict
+    except Exception as e:
+        print(f"IMPORT: Failed to import STEP file: {e}")
+        return None
+    # If the STEP file has multiple parts, FreeCAD imports it as a Compound.
+    # We can extract the individual solids using .Solids
+
+
 
 
 
