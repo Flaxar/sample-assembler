@@ -18,3 +18,7 @@ The result is saved as a .xyz file.
 6. **Crucial:** Assign specific elements to each cell using the `.set_atoms()` method to ensure the exporter has element data to write. 
 7. Map your CAD components to their corresponding atomic cells by grouping them into a list of tuples. 
 8. Run the script. The program will automatically filter the lattice grids to your CAD boundaries and generate your final .xyz file.
+
+## Notes when modeling
+- Every length unit is defined as a millimeter. However, there is no unit assigned in the .xyz files. 
+    Thus, we can consider it any unit we want, we just need to be consistent.

@@ -3,11 +3,6 @@ import sys
 ## ---------------- FreeCAD IMPORT --------------------
 
 # Define your FreeCAD paths (using 'r' before the string handles the Windows backslashes)
-# NOTEBOOK
-# freecad_bin_path = r"C:\Program Files\FreeCAD 1.1\bin"
-# freecad_lib_path = r"C:\Program Files\FreeCAD 1.1\bin\Lib"
-
-# PC
 freecad_bin_path = r"C:\Program Files\FreeCAD 1.1\bin"
 freecad_lib_path = r"C:\Program Files\FreeCAD 1.1\bin\Lib"
 
@@ -18,7 +13,6 @@ if freecad_bin_path not in sys.path:
 if freecad_lib_path not in sys.path:
     sys.path.append(freecad_lib_path)
 
-# Now you can import FreeCAD and its components
 try:
     import FreeCAD
     import Part
@@ -30,7 +24,12 @@ except ImportError as e:
 
 ## ----------------------------------------------------
 
-def import_part_shape(file_path):
+def __import_part_shape(file_path):
+    """
+    Deprecated. Use import_multi_body_step() instead.
+    This function returns the object as a variable directly.
+    However, the main function works with a dictionary.
+    """
     try:
         new_shape = Part.Shape()
         new_shape.read(file_path)
@@ -41,7 +40,15 @@ def import_part_shape(file_path):
     return new_shape
 
 def import_multi_body_step(filepath):
-    """Imports a STEP file and returns a list of individual solid shapes."""
+    """
+    Imports a STEP file and returns a dictionary of individual solid shapes, like this:
+    {
+        "Shape 1 name": shape1_object,
+        "Shape 2 name": shape2_object,
+        ...
+    }
+    The shape names are defined in the CAD software before exporting into a STEP file.
+    """
     try:
         doc = FreeCAD.newDocument("TempDoc")
         Import.insert(filepath, doc.Name)
@@ -57,8 +64,6 @@ def import_multi_body_step(filepath):
     except Exception as e:
         print(f"IMPORT: Failed to import STEP file: {e}")
         return None
-    # If the STEP file has multiple parts, FreeCAD imports it as a Compound.
-    # We can extract the individual solids using .Solids
 
 
 
