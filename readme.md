@@ -3,7 +3,7 @@ This program takes a .STEP file with one or multiple components and then fills t
 The result is saved as a .xyz file.
 ## Prerequisites
 - [ ] Download [FreeCAD](www.freecad.org/downloads.php?lang=en)
-- [ ] Install python version according to the FreeCAD version
+- [ ] Install python version according to the FreeCAD version. (I used FreeCAD 1.1 and Python 3.11)
 
 ## Setup
 1. Clone this repository
