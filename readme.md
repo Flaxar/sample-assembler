@@ -2,12 +2,12 @@
 This program takes a .STEP file with one or multiple components and then fills the shapes accordingly with atoms.
 The result is saved as a .xyz file.
 ## Prerequisites
-- [ ] Download [FreeCAD](www.freecad.org/downloads.php?lang=en)
-- [ ] Install python version according to the FreeCAD version. (I used FreeCAD 1.1 and Python 3.11)
+- Python 3.10 or newer
+- Install the Python dependencies with `python -m pip install -r requirements.txt`
 
 ## Setup
 1. Clone this repository
-2. In `FreeCAD_manager.py`, change the absolute path to your FreeCAD folder
+2. No CAD application installation is required; STEP files are read by build123d.
 
 ## How to use
 1. In your CAD program of choice, create one or multiple components and rename them as you wish.

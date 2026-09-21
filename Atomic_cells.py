@@ -1,11 +1,4 @@
-import numpy as np
-from enum import Enum
 import math
-try:
-    import FreeCAD
-    import Part
-except ImportError as e:
-    print(f"IMPORT: Exception {e}")
 
 # Define all the atoms you want to use in your atomic cells.
 class Atoms:

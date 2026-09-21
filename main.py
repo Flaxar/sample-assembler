@@ -1,13 +1,6 @@
-import FreeCAD_manager as cm
+import build123d_manager as cm
 import Atomic_cells as atc
-import math
-try:
-    import FreeCAD
-    import Part
-    import Import
-    print("IMPORT: FreeCAD imported successfully!")
-except ImportError as e:
-    print(f"IMPORT: Failed to import FreeCAD: {e}")
+from build123d import Vector
 
 
 def export_multiple_lattices_to_txt(part_data, output_path: str):
@@ -27,27 +20,27 @@ def export_multiple_lattices_to_txt(part_data, output_path: str):
         step_y = cell.step_y
         step_z = cell.step_z
 
-        bbox = target_shape.BoundBox
+        bbox = target_shape.bounding_box()
 
-        print(f"Scanning Bounding Box: X[{bbox.XMin:.2f}, {bbox.XMax:.2f}], "
-              f"Y[{bbox.YMin:.2f}, {bbox.YMax:.2f}], Z[{bbox.ZMin:.2f}, {bbox.ZMax:.2f}]")
+        print(f"Scanning Bounding Box: X[{bbox.min.X:.2f}, {bbox.max.X:.2f}], "
+              f"Y[{bbox.min.Y:.2f}, {bbox.max.Y:.2f}], Z[{bbox.min.Z:.2f}, {bbox.max.Z:.2f}]")
 
-        x = bbox.XMin - (bbox.XMin % step_x)
-        while x <= bbox.XMax + step_x:
-            y = bbox.YMin - (bbox.YMin % step_y)
-            while y <= bbox.YMax + step_y:
-                z = bbox.ZMin - (bbox.ZMin % step_z)
-                while z <= bbox.ZMax + step_z:
+        x = bbox.min.X - (bbox.min.X % step_x)
+        while x <= bbox.max.X + step_x:
+            y = bbox.min.Y - (bbox.min.Y % step_y)
+            while y <= bbox.max.Y + step_y:
+                z = bbox.min.Z - (bbox.min.Z % step_z)
+                while z <= bbox.max.Z + step_z:
 
                     # Iterate through all atoms defined in our unit cell
                     for index, (ax, ay, az) in enumerate(base_atoms):
-                        pt = FreeCAD.Vector(x + ax, y + ay, z + az)
+                        pt = Vector(x + ax, y + ay, z + az)
 
                         # Check if the translated point is inside the current shape
-                        if target_shape.isInside(pt, 1e-6, True):
-                            rx = round(pt.x, 9)
-                            ry = round(pt.y, 9)
-                            rz = round(pt.z, 9)
+                        if target_shape.is_inside(pt, tolerance=1e-6):
+                            rx = round(pt.X, 9)
+                            ry = round(pt.Y, 9)
+                            rz = round(pt.Z, 9)
                             # Add to dictionary. If the coordinate already exists
                             # from an adjacent shape, this overwrites/merges it.
                             element_data = cell.atom_elem[index]
@@ -88,7 +81,7 @@ if __name__ == '__main__':
 
     # Change the path to your .step file.
     # multi-body-test.step is included in the repository for a test run.
-    bodies = cm.import_multi_body_step(r"E:\Programming\VUT\sample-assembler\multi-body-test.step")
+    bodies = cm.import_multi_body_step(r"C:\Programming\VUT\sample-assembler\multi-body-test.step")
     compA = bodies["ComponentA"] # Use the same name as you did in the CAD
     compB = bodies["ComponentB"]
     compC = bodies["ComponentC"]
@@ -104,4 +97,3 @@ if __name__ == '__main__':
         export_multiple_lattices_to_txt(assembly_data, "Assembly_Atoms.xyz")
     except Exception as e:
         print(f"An error occurred during lattice generation: {e}")
-
