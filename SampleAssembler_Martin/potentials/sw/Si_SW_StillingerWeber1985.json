@@ -1,0 +1,22 @@
+{
+  "key": "Si_SW_StillingerWeber1985",
+  "name": "Si Stillinger-Weber (Stillinger-Weber 1985)",
+  "elements": ["Si"],
+  "pair_style": "sw",
+  "pair_coeff_form": "manybody",
+  "param_files": ["Si_SW_StillingerWeber1985.sw"],
+  "required_units": "metal",
+  "required_atom_style": "atomic",
+  "requires_qeq": false,
+  "qeq_fix": null,
+  "needs_packages": ["MANYBODY"],
+  "recommended_timestep_fs": 1.0,
+  "default_temperature_K": 300,
+  "applicable_materials": ["Si"],
+  "validity_notes": "Original SW parameterisation for diamond-cubic Si: 2-body + 3-body angular term enforcing the 109.47 deg tetrahedral angle, fitted to a0 = 5.431 A and the cohesive energy. The canonical choice for frozen-phonon / thermal-diffuse-scattering multislice work on Si. Good phonons and elastic constants near 300 K; known to over-predict the melting point (~2500 K vs 1687 K) and it is not fitted to liquid/amorphous Si or to surface reconstructions.",
+  "confidence": "high",
+  "citation": "F. H. Stillinger, T. A. Weber, Phys. Rev. B 31, 5262 (1985). DOI:10.1103/PhysRevB.31.5262",
+  "source_url": "https://docs.lammps.org/pair_sw.html",
+  "source_note": "Copied verbatim from the local LAMMPS 15Jun2023 distribution (Potentials/Si.sw; header: DATE 2007-06-11, CONTRIBUTOR Aidan Thompson, CITATION Stillinger and Weber 1985).",
+  "license": "Redistributed with LAMMPS; cite the paper above."
+}

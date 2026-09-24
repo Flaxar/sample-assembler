@@ -1,0 +1,22 @@
+{
+  "key": "GaN_SW_BereSerra2006",
+  "name": "GaN Stillinger-Weber (Bere-Serra 2006)",
+  "elements": ["Ga", "N"],
+  "pair_style": "sw",
+  "pair_coeff_form": "manybody",
+  "param_files": ["GaN_SW_BereSerra2006.sw"],
+  "required_units": "metal",
+  "required_atom_style": "atomic",
+  "requires_qeq": false,
+  "qeq_fix": null,
+  "needs_packages": ["MANYBODY"],
+  "recommended_timestep_fs": 1.0,
+  "default_temperature_K": 300,
+  "applicable_materials": ["GaN_wz"],
+  "validity_notes": "Stillinger-Weber GaN parameterised specifically for dislocation cores in wurtzite GaN (the preferred choice for line/screw/threading-dislocation studies). Pairwise-derived 3-body terms. No long-range Coulomb. Less general than the Tersoff for bulk thermomechanics.",
+  "confidence": "med",
+  "citation": "A. Bere, A. Serra, Phil. Mag. 86, 2159 (2006). DOI:10.1080/14786430600640486",
+  "source_url": "https://www.ctcms.nist.gov/potentials/system/Ga-N/",
+  "source_note": "Copied verbatim from the local LAMMPS 15Jun2023 distribution (Potentials/GaN.sw).",
+  "license": "Redistributed with LAMMPS; cite the paper above."
+}

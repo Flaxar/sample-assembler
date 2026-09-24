@@ -1,0 +1,22 @@
+{
+  "key": "GaN_Tersoff_NAE2003",
+  "name": "GaN Tersoff (Nord-Albe-Erhart-Nordlund 2003)",
+  "elements": ["Ga", "N"],
+  "pair_style": "tersoff",
+  "pair_coeff_form": "manybody",
+  "param_files": ["GaN_Tersoff_NordAlbeErhart2003.tersoff"],
+  "required_units": "metal",
+  "required_atom_style": "atomic",
+  "requires_qeq": false,
+  "qeq_fix": null,
+  "needs_packages": ["MANYBODY"],
+  "recommended_timestep_fs": 1.0,
+  "default_temperature_K": 300,
+  "applicable_materials": ["GaN_wz", "GaN_zb"],
+  "validity_notes": "Bond-order Tersoff for wurtzite & zinc-blende GaN; good general-purpose choice for structure, thermal displacements and point/line defects. No long-range Coulomb -> does not reproduce LO/TO phonon splitting. Shipped with LAMMPS (contributor X. Zhou, Sandia).",
+  "confidence": "high",
+  "citation": "J. Nord, K. Albe, P. Erhart, K. Nordlund, J. Phys.: Condens. Matter 15, 5649 (2003). DOI:10.1088/0953-8984/15/32/324",
+  "source_url": "https://openkim.org/id/Tersoff_LAMMPS_NordAlbeErhart_2003_GaN__MO_612061685362_004",
+  "source_note": "Copied verbatim from the local LAMMPS 15Jun2023 distribution (Potentials/GaN.tersoff).",
+  "license": "Redistributed with LAMMPS; cite the paper above."
+}
