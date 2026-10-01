@@ -33,8 +33,11 @@ then available in the component selector below the button.
    later fills carve / overlap earlier ones.
 3. **Build options** (panel 3): auto/explicit box, margin, periodic/shrink
    boundary, overlap deletion + cutoff, amorphous min-separation, dump filename.
-4. **MD simulation** (panel 4): MD controls are retained for project
-   compatibility, but this exporter does not execute LAMMPS dynamics.
+4. **MD simulation** (panel 4): select a compatible potential and enable
+   **Run LAMMPS relaxation after export**. The thermalize/anneal workflows
+   create velocities, hold the selected temperature, cool to 1 K, minimize
+   with conjugate gradients, and write a relaxed XYZ snapshot. The `relax`
+   workflow skips the thermal stage and performs only the minimization.
 5. **Export** (panel 5): write the ASE LAMMPS data file and save/load the design
    as a `.saproj` JSON project.
 
@@ -86,18 +89,19 @@ are performed before ASE writes the file.
 - All coordinates are **Å** (`units box`), matching the multislice convention.
 - **Z axis:** the beam enters at `z_min` and exits at `z_max`. The crossgrating
   places the carbon film at `z ≈ 0` and nanoparticles above it.
--   The exported coordinates are a clean build: equilibrium lattice positions for
-  crystals and density-based random positions for amorphous materials. Dynamics
-  can be run later by using the exported data file as input to a separate LAMMPS
-  workflow.
+- The exported coordinates are a clean build: equilibrium lattice positions for
+  crystals and density-based random positions for amorphous materials. Optional
+  LAMMPS minimization is a separate post-export step; it does not change the
+  original data file.
 
 ## Interatomic potentials & MD (`potentials/`, `MD_PLAYBOOK.md`)
 
 The `potentials/` folder is a curated library — a LAMMPS parameter file plus a JSON
-sidecar (citation, elements, units, atom_style, confidence) per potential, auto-loaded
-by `potentials/registry.py`. GaN ships curated (Tersoff Nord–Albe–Erhart 2003; SW
-Béré–Serra 2006). **`MD_PLAYBOOK.md`** is the reference for which potential / thermostat
-/ ensemble / timestep to use per material (e.g. *"do a GaN MD run"*). Adding a potential =
+sidecar (citation, elements, units, atom_style, confidence) per potential,
+auto-loaded by `potentials/registry.py`. The library includes a Si-Ge Tersoff
+potential for structural relaxation and the GaN potentials. **`MD_PLAYBOOK.md`**
+is the reference for which potential / thermostat / ensemble / timestep to use
+per material. Adding a potential =
 drop the file + a sidecar JSON into `potentials/<family>/`.
 
 ## Tools

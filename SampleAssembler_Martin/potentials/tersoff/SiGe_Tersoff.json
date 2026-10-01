@@ -1,0 +1,22 @@
+{
+  "key": "SiGe_Tersoff",
+  "name": "Si-Ge Tersoff alloy (Tersoff 1989)",
+  "elements": ["Si", "Ge"],
+  "pair_style": "tersoff",
+  "pair_coeff_form": "manybody",
+  "param_files": ["SiGe_Tersoff.tersoff"],
+  "required_units": "metal",
+  "required_atom_style": "atomic",
+  "requires_qeq": false,
+  "qeq_fix": null,
+  "needs_packages": ["MANYBODY"],
+  "recommended_timestep_fs": 1.0,
+  "default_temperature_K": 300,
+  "applicable_materials": ["Si", "Ge", "SiGe"],
+  "validity_notes": "Tersoff Si-Ge alloy parameterization. Suitable for structural relaxation of Si, Ge, and SiGe configurations; validate the chosen composition and interface against experimental or higher-level data.",
+  "confidence": "high",
+  "citation": "J. Tersoff, Phys. Rev. B 39, 5566 (1989), with errata in Phys. Rev. B 41, 3248.",
+  "source_url": "https://github.com/lammps/lammps/blob/develop/potentials/SiCGe.tersoff",
+  "source_note": "Derived from the Si-Ge subset of the LAMMPS SiCGe.tersoff potential; Si(D) labels normalized to Si.",
+  "license": "Redistributed with LAMMPS; cite the paper above."
+}
