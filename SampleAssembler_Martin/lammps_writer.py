@@ -27,6 +27,9 @@ class MDOptions:
     snapshots: int = 10
     snapshot_interval: int = 500
     seed: int = 90210
+    backend: str = "lammps"
+    mace_model: str = "medium"
+    mace_fmax: float = 0.05
 
 
 def build_script(fills, opts: WriterOptions, title="Sample Assembler build", md=None):

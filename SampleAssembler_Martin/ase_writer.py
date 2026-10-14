@@ -13,6 +13,21 @@ import geometry as geo
 from geometry import Box, Sphere, Hemisphere, Cylinder, Cone, ImportedRegion, Fill
 from materials import MATERIALS, ELEMENT_MASS
 
+_TORCH_DLL_HANDLES = []
+
+
+def _prepare_torch_dlls():
+    import os
+    import sys
+    if sys.platform != "win32":
+        return
+    candidates = [
+        os.path.join(sys.prefix, "Lib", "site-packages", "torch", "lib"),
+    ]
+    for torch_lib in candidates:
+        if os.path.isdir(torch_lib):
+            _TORCH_DLL_HANDLES.append(os.add_dll_directory(torch_lib))
+
 
 @dataclass
 class WriterOptions:
@@ -303,11 +318,39 @@ def export_xyz(path, fills, options, progress=None):
     return result
 
 
+def relax_with_mace(input_path, output_path, model="medium", fmax=0.05,
+                    device="cpu", trajectory_path=None):
+    """Relax an XYZ structure with the selected MACE-MP model.
+
+    MACE is imported lazily so users who only use LAMMPS do not need the
+    optional PyTorch/MACE stack installed.
+    """
+    import os
+    import sys
+    _prepare_torch_dlls()
+    import torch
+
+    from ase.io import read as read_atoms
+    from ase.optimize import LBFGS
+    from mace.calculators import mace_mp
+
+    atoms = read_atoms(input_path)
+    print(f"Loaded {len(atoms):,} atoms.", flush=True)
+    print(f"Loading MACE-MP {model} model on {device}...", flush=True)
+    atoms.calc = mace_mp(model=model, default_dtype="float32", device=device)
+    print("Starting LBFGS relaxation...", flush=True)
+    optimizer = LBFGS(atoms, trajectory=trajectory_path, logfile="-")
+    optimizer.run(fmax=fmax)
+    print("Writing relaxed structure...", flush=True)
+    write(output_path, atoms, format="xyz")
+    return output_path
+
+
 def write_minimization_input(path, data_path, dump_path, potential, type_table,
                              boundary="p p p", overlap_cutoff=1.2,
                              workflow="relax", temperature=800.0,
                              equilibration_steps=5000, timestep_fs=1.0,
-                             seed=87287):
+                             seed=87287, initial_temperature=1.0):
     """Write a LAMMPS input which cleans overlaps and minimizes the exported data.
 
     The data file and dump are resolved relative to the input file so the
@@ -354,8 +397,8 @@ def write_minimization_input(path, data_path, dump_path, potential, type_table,
         timestep_ps = timestep_fs / 1000.0
         lines.extend([
             f"timestep {timestep_ps:.8g}",
-            f"velocity all create {temperature:.8g} {seed:d} loop geom",
-            f"fix anneal_heat all nvt temp {temperature:.8g} {temperature:.8g} 0.1",
+            f"velocity all create {initial_temperature:.8g} {seed:d} loop geom",
+            f"fix anneal_heat all nvt temp {initial_temperature:.8g} {temperature:.8g} 0.1",
             f"run {equilibration_steps:d}",
             "unfix anneal_heat",
             f"fix anneal_cool all nvt temp {temperature:.8g} 1.0 0.1",

@@ -24,6 +24,7 @@ import glob
 import json
 import shutil
 import subprocess
+import importlib.util
 from dataclasses import asdict
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
@@ -42,7 +43,7 @@ from geometry import Box, Sphere, Hemisphere, Cylinder, Cone, ImportedRegion, Fi
 from materials import MATERIALS, get_material, materials_by_category
 import lammps_writer as lw
 from lammps_writer import WriterOptions, MDOptions
-from ase_writer import export_lammps, export_xyz, write_minimization_input
+from ase_writer import export_lammps, export_xyz, write_minimization_input, relax_with_mace
 from crossgrating import CrossgratingParams, build_crossgrating
 from preview3d import PreviewCanvas
 from step_import import import_step_components
@@ -80,6 +81,21 @@ def find_lammps():
         if path:
             return path
     return None
+
+
+def mace_available():
+    if importlib.util.find_spec("mace") is None:
+        return False
+    try:
+        probe = subprocess.run(
+            [sys.executable, "-c",
+             "import torch; from mace.calculators import mace_mp"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=30, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return probe.returncode == 0
 
 
 # ── helpers ─────────────────────────────────────────────────────────────────────
@@ -130,6 +146,48 @@ class RunnerThread(QThread):
 
     def stop(self):
         if self._proc and self._proc.poll() is None:
+            self._proc.terminate()
+
+
+class MaceRunnerThread(QThread):
+    output_line = pyqtSignal(str)
+    finished_relaxation = pyqtSignal(int, str)
+
+    def __init__(self, input_path, output_path, model, fmax):
+        super().__init__()
+        self.input_path = input_path
+        self.output_path = output_path
+        self.model = model
+        self.fmax = fmax
+
+    def run(self):
+        try:
+            import json
+            code = (
+                "from ase_writer import relax_with_mace; "
+                "relax_with_mace("
+                f"{json.dumps(self.input_path)}, {json.dumps(self.output_path)}, "
+                f"model={json.dumps(self.model)}, fmax={self.fmax!r}, "
+                f"trajectory_path={json.dumps(os.path.splitext(self.output_path)[0] + '.traj')})"
+            )
+            self._proc = subprocess.Popen(
+                [sys.executable, "-c", code],
+                cwd=os.path.dirname(os.path.abspath(__file__)),
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1,
+            )
+            for line in self._proc.stdout:
+                self.output_line.emit(line.rstrip())
+            returncode = self._proc.wait()
+            if returncode:
+                raise RuntimeError(f"MACE process exited with {returncode}")
+        except Exception as exc:  # noqa: BLE001
+            self.finished_relaxation.emit(-1, str(exc))
+        else:
+            self.finished_relaxation.emit(0, self.output_path)
+
+    def stop(self):
+        if getattr(self, "_proc", None) and self._proc.poll() is None:
             self._proc.terminate()
 
 
@@ -198,6 +256,8 @@ class MainWindow(QMainWindow):
         self.opts = WriterOptions()
         self.lammps_exe = find_lammps()
         self._last_saved_path = None
+        self._last_mace_input = None
+        self._last_mace_output = None
         self._last_data_path = None
         self._runner = None
         # Embedding hook (SEB-MS "Specimens" workspace): host sets a callback
@@ -544,9 +604,23 @@ class MainWindow(QMainWindow):
         self.md_body = QWidget()
         form = QFormLayout(self.md_body); form.setContentsMargins(0, 0, 0, 0)
 
+        self.md_backend = QComboBox()
+        self.md_backend.addItem("LAMMPS", "lammps")
+        self.md_backend.addItem("MACE MLIP (ASE)", "mace")
+        self.md_backend.currentIndexChanged.connect(self._on_backend_changed)
+        form.addRow("Relaxation backend", self.md_backend)
+
         self.md_potential = QComboBox()                      # populated in _update_md_potentials
         self.md_potential.currentIndexChanged.connect(self._refresh)
         form.addRow("Potential", self.md_potential)
+
+        self.md_mace_model = QComboBox()
+        self.md_mace_model.addItems(["medium", "large"])
+        self.md_mace_model.currentIndexChanged.connect(self._refresh)
+        form.addRow("MACE model", self.md_mace_model)
+        self.md_mace_fmax = _dspin(0.05, 0.001, 1.0, 0.01, 3)
+        self.md_mace_fmax.valueChanged.connect(self._refresh)
+        form.addRow("MACE force threshold (eV/Å)", self.md_mace_fmax)
 
         self.md_hint = QLabel(""); self.md_hint.setProperty("role", "hint"); self.md_hint.setWordWrap(True)
         form.addRow(self.md_hint)
@@ -602,12 +676,31 @@ class MainWindow(QMainWindow):
             self.md_enable.setEnabled(False)
             self.md_enable.setToolTip("No potentials curated in potentials/ — clean build only.")
         self.md_body.setEnabled(False)
+        self._update_backend_controls()
         self._apply_md_workflow_visibility()                  # no _refresh (preview not built yet)
         self.left.addWidget(g)
 
     def _on_md_enable_toggled(self):
         self.md_body.setEnabled(self.md_enable.isChecked())
         self._refresh()
+
+    def _on_backend_changed(self):
+        self._update_backend_controls()
+        self._refresh()
+
+    def _update_backend_controls(self):
+        is_mace = self.md_backend.currentData() == "mace"
+        self.md_potential.setEnabled(not is_mace)
+        self.md_mace_model.setEnabled(is_mace)
+        self.md_mace_fmax.setEnabled(is_mace)
+        self.md_enable.setText(
+            "Run MACE MLIP relaxation after export" if is_mace
+            else "Run LAMMPS relaxation after export")
+        if hasattr(self, "run_btn"):
+            self.run_btn.setText("Run MACE relaxation" if is_mace else "Run LAMMPS")
+        if is_mace and not mace_available():
+            self.md_enable.setEnabled(False)
+            self.md_enable.setToolTip("Install mace-torch to enable MACE relaxation.")
 
     def _apply_md_workflow_visibility(self):
         wf = self.md_workflow.currentData()
@@ -625,19 +718,18 @@ class MainWindow(QMainWindow):
     def _update_md_potentials(self):
         """Repopulate the potential combo with potentials covering the sample's elements
         (preserving the current selection by key). Signals blocked → no recursion."""
-        if not POTENTIALS:
-            return
         elems = set()
         for f in self.fills:
             if f.enabled:
                 elems.update(get_material(f.material_key).elements())
-        covering = potentials_covering(elems) if elems else []
+        covering = potentials_covering(elems) if elems and POTENTIALS else []
         pots = covering if covering else list(POTENTIALS.values())
-        self.md_enable.setEnabled(bool(covering))
-        if not covering:
+        backend = self.md_backend.currentData()
+        self.md_enable.setEnabled(bool(covering) if backend == "lammps" else mace_available())
+        if backend == "lammps" and not covering:
             self.md_enable.setChecked(False)
             self.md_enable.setToolTip("No curated potential covers all sample elements.")
-        else:
+        elif backend == "lammps":
             self.md_enable.setToolTip("Run a LAMMPS minimization after exporting the data file.")
         prev = self.md_potential.currentData()
         self.md_potential.blockSignals(True)
@@ -674,6 +766,9 @@ class MainWindow(QMainWindow):
             snapshots=self.md_nsnap.value(),
             snapshot_interval=self.md_interval.value(),
             seed=self.md_seed.value(),
+            backend=self.md_backend.currentData() or "lammps",
+            mace_model=self.md_mace_model.currentText(),
+            mace_fmax=self.md_mace_fmax.value(),
         )
 
     def _build_actions_group(self):
@@ -685,10 +780,14 @@ class MainWindow(QMainWindow):
         xyz.clicked.connect(self._export_xyz)
         v.addWidget(xyz)
         self.run_btn = make_button("Run LAMMPS")
-        self.run_btn.clicked.connect(self._run_lammps)
+        self.run_btn.clicked.connect(self._run_relaxation)
         self.run_btn.setEnabled(False)
         self.run_btn.setToolTip("Export a data file with minimization enabled first.")
         v.addWidget(self.run_btn)
+        self.stop_relax_btn = make_button("Stop relaxation")
+        self.stop_relax_btn.clicked.connect(self._stop_relaxation)
+        self.stop_relax_btn.setEnabled(False)
+        v.addWidget(self.stop_relax_btn)
         choose_lammps = make_button("Choose LAMMPS executable…")
         choose_lammps.clicked.connect(self._choose_lammps)
         v.addWidget(choose_lammps)
@@ -968,7 +1067,18 @@ class MainWindow(QMainWindow):
         self._last_type_table = dict(result.type_table)
         self._last_saved_path = path
         md = self._md_options()
-        if md is not None:
+        if md is not None and md.backend == "mace":
+            from ase.io import write as ase_write
+            data_dir = os.path.dirname(os.path.abspath(path))
+            self._last_mace_input = os.path.splitext(path)[0] + "_initial.xyz"
+            self._last_mace_output = os.path.join(
+                data_dir, self.dump_name.text().strip() or "relaxed.xyz")
+            ase_write(self._last_mace_input, result.atoms, format="xyz")
+            self._last_saved_path = self._last_mace_input
+            self._last_dump_paths = []
+            self.run_btn.setEnabled(mace_available())
+            self._log(f"Wrote MACE input structure {self._last_mace_input}")
+        elif md is not None:
             potential = POTENTIALS.get(md.potential_key)
             if potential is None:
                 raise ValueError(f"Unknown LAMMPS potential: {md.potential_key}")
@@ -1046,6 +1156,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Generate first", "Generate the .lmp file before running.")
             return
         self.run_btn.setEnabled(False)
+        self.stop_relax_btn.setEnabled(True)
         cmd = f"{self.lammps_exe} -in {os.path.basename(self._last_saved_path)}"
         self._log(f"Running: {cmd}")
         # show the live console
@@ -1057,6 +1168,64 @@ class MainWindow(QMainWindow):
         self._runner.finished_run.connect(self._on_run_finished)
         self._runner.start()
 
+    def _run_relaxation(self):
+        if self.md_backend.currentData() == "mace":
+            if not self._last_mace_input or not self._last_mace_output:
+                QMessageBox.information(self, "Generate first",
+                                        "Export the sample with MACE selected first.")
+                return
+            try:
+                with open(self._last_mace_input, encoding="utf-8") as stream:
+                    atom_count = int(stream.readline().strip())
+            except (OSError, ValueError) as exc:
+                QMessageBox.warning(self, "MACE input error", str(exc))
+                return
+            if atom_count > 10000:
+                choice = QMessageBox.question(
+                    self, "Large MACE relaxation",
+                    f"This structure contains {atom_count:,} atoms. "
+                    "MACE relaxation on CPU may take a very long time and "
+                    "requires substantial memory. Continue?",
+                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if choice != QMessageBox.Yes:
+                    return
+            self.run_btn.setEnabled(False)
+            self.stop_relax_btn.setEnabled(True)
+            self.console_view.clear()
+            self.console_view.appendPlainText("Starting MACE relaxation...\n")
+            self.tabs.setCurrentWidget(self.console_view)
+            self._runner = MaceRunnerThread(
+                self._last_mace_input, self._last_mace_output,
+                self.md_mace_model.currentText(), self.md_mace_fmax.value())
+            self._runner.output_line.connect(self._on_mace_output)
+            self._runner.finished_relaxation.connect(self._on_mace_finished)
+            self._runner.start()
+            return
+        self._run_lammps()
+
+    def _stop_relaxation(self):
+        if isinstance(self._runner, MaceRunnerThread):
+            self._runner.stop()
+        elif isinstance(self._runner, RunnerThread):
+            self._runner.stop()
+
+    def _on_mace_finished(self, rc, message):
+        self.run_btn.setEnabled(True)
+        self.stop_relax_btn.setEnabled(False)
+        if rc == 0:
+            self._last_dump_paths = [message]
+            self._log(f"MACE relaxation complete: {message}")
+            QMessageBox.information(self, "MACE relaxation complete",
+                                    f"Relaxed XYZ written to:\n{message}")
+        else:
+            self.console_view.appendPlainText(f"MACE failed: {message}")
+            QMessageBox.warning(self, "MACE relaxation failed", message)
+
+    def _on_mace_output(self, line):
+        self.console_view.appendPlainText(line)
+        sb = self.console_view.verticalScrollBar()
+        sb.setValue(sb.maximum())
+
     def _on_run_output(self, line):
         self.console_view.appendPlainText(line)
         sb = self.console_view.verticalScrollBar()
@@ -1065,6 +1234,7 @@ class MainWindow(QMainWindow):
     def _on_run_finished(self, rc):
         self.console_view.appendPlainText(f"\n[process exited with code {rc}]")
         self.run_btn.setEnabled(True)
+        self.stop_relax_btn.setEnabled(False)
         d = os.path.dirname(self._last_saved_path)
         dump_name = os.path.basename(self.dump_name.text().strip())
         single = os.path.join(d, dump_name)
@@ -1138,7 +1308,10 @@ class MainWindow(QMainWindow):
                             "dump_file": self.dump_name.text(),
                             "seed_base": self.seed_base.value()},
                 "md": {"enable": self.md_enable.isChecked(),
+                       "backend": self.md_backend.currentData(),
                        "potential": self.md_potential.currentData(),
+                       "mace_model": self.md_mace_model.currentText(),
+                       "mace_fmax": self.md_mace_fmax.value(),
                        "workflow": self.md_workflow.currentData(),
                        "temperature": self.md_temp.value(),
                        "peak_T": self.md_peakT.value(),
@@ -1170,8 +1343,15 @@ class MainWindow(QMainWindow):
             self.dump_name.setText(o.get("dump_file", "sample.xyz"))
             self.seed_base.setValue(o.get("seed_base", 12345))
             m = data.get("md", {})
+            backend = self.md_backend.findData(m.get("backend", "lammps"))
+            if backend >= 0:
+                self.md_backend.setCurrentIndex(backend)
             self.md_enable.setChecked(m.get("enable", False))
             self.md_body.setEnabled(self.md_enable.isChecked())
+            model = self.md_mace_model.findText(m.get("mace_model", "medium"))
+            if model >= 0:
+                self.md_mace_model.setCurrentIndex(model)
+            self.md_mace_fmax.setValue(m.get("mace_fmax", 0.05))
             iw = self.md_workflow.findData(m.get("workflow", "thermalize"))
             if iw >= 0:
                 self.md_workflow.setCurrentIndex(iw)

@@ -33,10 +33,12 @@ then available in the component selector below the button.
    later fills carve / overlap earlier ones.
 3. **Build options** (panel 3): auto/explicit box, margin, periodic/shrink
    boundary, overlap deletion + cutoff, amorphous min-separation, dump filename.
-4. **MD simulation** (panel 4): select a compatible potential and enable
-   **Run LAMMPS relaxation after export**. The thermalize/anneal workflows
-   create velocities, hold the selected temperature, cool to 1 K, minimize
-   with conjugate gradients, and write a relaxed XYZ snapshot. The `relax`
+4. **MD simulation** (panel 4): choose either the LAMMPS backend with a
+   compatible curated potential, or the optional **MACE MLIP (ASE)** backend.
+   The thermalize/anneal workflows
+   create low-temperature velocities, gradually ramp to the selected
+   temperature, cool to 1 K, minimize with conjugate gradients, and write a
+   relaxed XYZ snapshot. The `relax`
    workflow skips the thermal stage and performs only the minimization.
 5. **Export** (panel 5): write the ASE LAMMPS data file and save/load the design
    as a `.saproj` JSON project.
@@ -103,6 +105,16 @@ potential for structural relaxation and the GaN potentials. **`MD_PLAYBOOK.md`**
 is the reference for which potential / thermostat / ensemble / timestep to use
 per material. Adding a potential =
 drop the file + a sidecar JSON into `potentials/<family>/`.
+
+MACE is optional because it requires PyTorch and a large model download. Install
+`mace-torch` in the active Python environment to enable the MACE backend:
+
+```bash
+python -m pip install mace-torch
+```
+
+MACE uses ASE's LBFGS optimizer and writes `<sample>.traj` plus the relaxed XYZ
+file. The LAMMPS backend remains available for curated non-ML potentials.
 
 ## Tools
 
