@@ -14,6 +14,7 @@ from geometry import Box, Sphere, Hemisphere, Cylinder, Cone, ImportedRegion, Fi
 from materials import MATERIALS, ELEMENT_MASS
 
 _TORCH_DLL_HANDLES = []
+_LATTICE_SIMILARITY_TOLERANCE = 0.05
 
 
 def _prepare_torch_dlls():
@@ -45,6 +46,8 @@ class WriterOptions:
     sort_ids: bool = True
     seed_base: int = 12345
     boundary: str = "p p p"
+    unify_similar_lattices: bool = True
+    lattice_similarity_threshold: float = 0.05
 
 
 @dataclass
@@ -82,7 +85,48 @@ def _region_volume(region):
     return 0.0
 
 
-def estimate_atoms(fill):
+def _material_lattice_scale(fill):
+    mat = MATERIALS[fill.material_key]
+    if mat.alloy is not None and fill.alloy_x is not None:
+        return mat.alloy.a_of_x(fill.alloy_x, mat.a)
+    return mat.a
+
+
+def _lattice_family(fill):
+    """Return the normalized cell/basis signature used for shared spacing."""
+    mat = MATERIALS[fill.material_key]
+    if mat.kind != "crystal":
+        return None
+    vectors = np.asarray((mat.a1, mat.a2, mat.a3), dtype=float)
+    return (
+        tuple(np.round(vectors, 8).ravel()),
+        tuple(np.round(np.asarray(mat.basis, dtype=float), 8).ravel()),
+    )
+
+
+def _shared_lattice_scales(fills, enabled=True, threshold=None):
+    """Use the smallest spacing for similar, structurally compatible crystals."""
+    scales = {id(fill): _material_lattice_scale(fill) for fill in fills}
+    if not enabled:
+        return scales
+    threshold = _LATTICE_SIMILARITY_TOLERANCE if threshold is None else max(0.0, threshold)
+    families = {}
+    for fill in fills:
+        family = _lattice_family(fill)
+        if family is not None:
+            families.setdefault(family, []).append(fill)
+
+    for family_fills in families.values():
+        family_scales = [_material_lattice_scale(fill) for fill in family_fills]
+        smallest = min(family_scales)
+        largest = max(family_scales)
+        if largest <= smallest * (1.0 + threshold):
+            for fill in family_fills:
+                scales[id(fill)] = smallest
+    return scales
+
+
+def estimate_atoms(fill, lattice_scale=None):
     mat = MATERIALS[fill.material_key]
     if mat.kind == "amorphous":
         return int(round(mat.atoms_per_a3() * _region_volume(fill.region)))
@@ -90,7 +134,8 @@ def estimate_atoms(fill):
     det = (a1[0] * (a2[1] * a3[2] - a2[2] * a3[1])
            - a1[1] * (a2[0] * a3[2] - a2[2] * a3[0])
            + a1[2] * (a2[0] * a3[1] - a2[1] * a3[0]))
-    volume = abs(det) * mat.a ** 3
+    scale = _material_lattice_scale(fill) if lattice_scale is None else lattice_scale
+    volume = abs(det) * scale ** 3
     return int(round(len(mat.basis) * _region_volume(fill.region) / volume))
 
 
@@ -164,11 +209,9 @@ def _inside(region, point, bounds=None):
     raise TypeError(f"Unsupported region type: {type(region).__name__}")
 
 
-def _lattice_points(fill, box, rng):
+def _lattice_points(fill, box, rng, lattice_scale=None):
     mat = MATERIALS[fill.material_key]
-    scale = mat.a
-    if mat.alloy is not None and fill.alloy_x is not None:
-        scale = mat.alloy.a_of_x(fill.alloy_x, mat.a)
+    scale = _material_lattice_scale(fill) if lattice_scale is None else lattice_scale
     vectors = _cell_vectors(mat, fill, scale)
     inverse = np.linalg.inv(vectors.T)
     # Scan only the fill's own AABB. Scanning the union box for every STEP
@@ -268,14 +311,21 @@ def build_atoms(fills, options, progress=None):
         box = tuple(value + (-options.margin if i % 2 == 0 else options.margin)
                     for i, value in enumerate(bounds))
     positions, symbols, warnings, per_fill = [], [], [], []
+    lattice_scales = _shared_lattice_scales(
+        enabled,
+        enabled=options.unify_similar_lattices,
+        threshold=options.lattice_similarity_threshold,
+    )
     for index, fill in enumerate(enabled):
         progress(5 + int(75 * index / max(len(enabled), 1)),
                  f"Generating atoms for {fill.name}...")
         mat = MATERIALS[fill.material_key]
-        per_fill.append((fill.name, estimate_atoms(fill)))
+        per_fill.append((fill.name, estimate_atoms(
+            fill, lattice_scales.get(id(fill)))))
         rng = np.random.default_rng(options.seed_base + index + 1)
         if mat.kind == "crystal":
-            new_positions, new_symbols = _lattice_points(fill, box, rng)
+            new_positions, new_symbols = _lattice_points(
+                fill, box, rng, lattice_scales.get(id(fill)))
         else:
             new_positions, new_symbols = _random_points(fill, box, rng, warnings, options)
         if fill.carve and positions:

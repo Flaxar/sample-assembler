@@ -581,6 +581,15 @@ class MainWindow(QMainWindow):
         form.addRow(self.del_overlap)
         self.overlap_cut = _dspin(1.2, 0.1, 10, 0.1, 2); self.overlap_cut.valueChanged.connect(self._refresh)
         form.addRow("Overlap cutoff (Å)", self.overlap_cut)
+        self.unify_similar_lattices = QCheckBox("Use smallest spacing for similar lattices")
+        self.unify_similar_lattices.setChecked(True)
+        self.unify_similar_lattices.toggled.connect(self._on_lattice_unification_toggled)
+        self.unify_similar_lattices.toggled.connect(self._refresh)
+        form.addRow(self.unify_similar_lattices)
+        self.lattice_similarity_threshold = _dspin(5.0, 0.0, 100.0, 0.5, 1)
+        self.lattice_similarity_threshold.valueChanged.connect(self._refresh)
+        form.addRow("Similarity threshold (%)", self.lattice_similarity_threshold)
+        self._on_lattice_unification_toggled(True)
         self.min_sep = QCheckBox("Enforce min-separation for amorphous (slow for huge films)")
         self.min_sep.setChecked(True); self.min_sep.stateChanged.connect(self._refresh)
         form.addRow(self.min_sep)
@@ -590,6 +599,9 @@ class MainWindow(QMainWindow):
         self.seed_base.valueChanged.connect(self._refresh)
         form.addRow("Seed base", self.seed_base)
         self.left.addWidget(g)
+
+    def _on_lattice_unification_toggled(self, checked):
+        self.lattice_similarity_threshold.setEnabled(checked)
 
     def _build_md_group(self):
         g = QGroupBox("4 · MD simulation (optional)")
@@ -983,6 +995,8 @@ class MainWindow(QMainWindow):
         opts.box_mode = "auto" if self.auto_box.isChecked() else "explicit"
         opts.delete_overlap = self.del_overlap.isChecked()
         opts.overlap_cutoff = self.overlap_cut.value()
+        opts.unify_similar_lattices = self.unify_similar_lattices.isChecked()
+        opts.lattice_similarity_threshold = self.lattice_similarity_threshold.value() / 100.0
         opts.enforce_min_sep = self.min_sep.isChecked()
         opts.dump_file = self.dump_name.text().strip() or "sample.xyz"
         opts.seed_base = self.seed_base.value()
@@ -1305,6 +1319,8 @@ class MainWindow(QMainWindow):
                             "margin": self.margin.value(),
                             "delete_overlap": self.del_overlap.isChecked(),
                             "overlap_cutoff": self.overlap_cut.value(),
+                            "unify_similar_lattices": self.unify_similar_lattices.isChecked(),
+                            "lattice_similarity_threshold": self.lattice_similarity_threshold.value(),
                             "dump_file": self.dump_name.text(),
                             "seed_base": self.seed_base.value()},
                 "md": {"enable": self.md_enable.isChecked(),
@@ -1340,6 +1356,10 @@ class MainWindow(QMainWindow):
             self.margin.setValue(o.get("margin", 0.0))
             self.del_overlap.setChecked(o.get("delete_overlap", True))
             self.overlap_cut.setValue(o.get("overlap_cutoff", 1.2))
+            self.unify_similar_lattices.setChecked(o.get("unify_similar_lattices", True))
+            self.lattice_similarity_threshold.setValue(
+                o.get("lattice_similarity_threshold", 5.0)
+            )
             self.dump_name.setText(o.get("dump_file", "sample.xyz"))
             self.seed_base.setValue(o.get("seed_base", 12345))
             m = data.get("md", {})

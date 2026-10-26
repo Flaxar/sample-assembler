@@ -46,6 +46,12 @@ then available in the component selector below the button.
 The right pane shows a live 3D preview, the generated `.lmp`, and an **Info & Log**
 tab (global atom-type table, per-region atom-count estimate, warnings, run log).
 
+When multiple compatible crystalline regions use similar lattice parameters, the
+builder uses the smallest parameter for all of them. This is useful for strained
+systems such as Si and SiGe: thermalization can then relax the shared lattice
+instead of starting from an expanded alloy cell. Unrelated crystal structures
+are not merged, and amorphous materials are unaffected.
+
 ## Materials library (`materials.py`)
 
 > **This library is designed to grow** — more materials, elements, and sample
