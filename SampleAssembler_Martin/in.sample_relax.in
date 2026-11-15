@@ -63,6 +63,11 @@ thermo 10                               # Do logu se budou vypisovat termodynami
 thermo_style custom step temp pe ke etotal press pxx pyy pzz # Definuje přesné sloupce pro výpis (důležité pro Python grafy).
 timestep 0.001                          # Nastavuje délku jednoho časového kroku na 0.001 pikosekundy (1 femtosekunda).
 
+# --- ZÁZNAM ANIMACE PRO OVITO ---
+# Uloží pozice atomů každých 10 kroků do souboru animace.lammpstrj
+dump animace_ovito all custom 10 animace.lammpstrj id element x y z
+dump_modify animace_ovito element Si Ge sort id
+
 # --- 1. MINIMALIZACE (Odstranění počátečních pnutí) ---
 min_style cg                            # Nastavuje algoritmus pro minimalizaci energie na metodu sdružených gradientů.
 minimize 1.0e-6 1.0e-8 1000 10000       # Zrelaxuje strukturu před začátkem simulace v čase.
@@ -77,6 +82,8 @@ unfix anneal_heat                       # Ukončí proces zahřívání.
 fix anneal_cool all nvt temp 500 1.0 0.1 # Plynule zchladí systém z 300 K zpět na 1 K.
 run 5000                                # Spustí simulaci chlazení na 5000 kroků.
 unfix anneal_cool                       # Ukončí proces chlazení.
+
+undump animace_ovito
 
 # === Plynulé zahřívání s NPT termostatem a barostatem ===
 # iso 0 0 1.0 znamená: udržuj izotropní tlak 0 barů na začátku i na konci, tlumící parametr 1.0 ps

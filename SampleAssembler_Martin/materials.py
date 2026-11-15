@@ -36,7 +36,8 @@ ELEMENT_MASS = {
     "H": 1.008,  "B": 10.811, "C": 12.011, "N": 14.007, "O": 15.999,
     "Al": 26.982, "Si": 28.0855, "P": 30.974, "S": 32.06, "Ti": 47.867,
     "Cu": 63.546, "Ga": 69.723, "Ge": 72.630, "As": 74.9216, "Sr": 87.62,
-    "Mo": 95.95, "In": 114.818, "Hf": 178.49, "W": 183.84, "Au": 196.967,
+    "Zr": 91.22, "Mo": 95.95, "In": 114.818, "Hf": 178.49, "Ta": 180.95,
+    "W": 183.84, "Au": 196.967,
 }
 
 # ── Reusable fractional bases ──────────────────────────────────────────────────
@@ -368,6 +369,14 @@ def _build_library():
     add(Material("aAl2O3", "Amorphous Al2O3 (ALD)", "Al2O3", "amorphous", "amorphous",
                  density_g_cm3=3.00, stoich=[("Al", 2), ("O", 3)], confidence="med",
                  notes="ALD/amorphous alumina spacer, ρ≈3.0 g/cm³ (crystalline corundum is 3.95)."))
+
+    # https://next-gen.materialsproject.org/materials/mp-251
+    b, e = _rocksalt("Ta", "N")
+    add(Material("TaN", "Tantalum Nitride", "TaN", "metal", "crystal",
+                 a=4.42, basis=b, basis_elements=e,
+                 notes="Cubic rocksalt (Fm-3m) phase. Lattice parameter 4.42 Å matches DFT data from Materials Project (mp-10898)."))
+
+
 
     return M
 
