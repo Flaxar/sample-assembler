@@ -376,6 +376,22 @@ def _build_library():
                  a=4.42, basis=b, basis_elements=e,
                  notes="Cubic rocksalt (Fm-3m) phase. Lattice parameter 4.42 Å matches DFT data from Materials Project (mp-10898)."))
 
+    b, e = _fluorite("Hf", "O")
+    add(Material("HZO", "Hafnium Zirconium Oxide", "Hf(1-x)Zr(x)O2",
+                 "dielectric", "crystal",
+                 a=5.115, basis=b, basis_elements=e,
+                 alloy=AlloyInfo("Hf", "Zr", 0.50, (5.115, 0.025, 0.0)),
+                 notes="Modeled as cubic fluorite parent phase with random Hf/Zr cation substitution. "
+                       "Vegard approx. interpolates cubic HfO2 (~5.115 Å) and ZrO2 (~5.140 Å). "
+                       "Designed for subsequent relaxation to orthorhombic Pca2_1 phase via MLIP (MACE). "
+                       "Refs: Park et al. (APL 2013), Materlik et al. (JAP 2015), Müller et al. (Nano Lett. 2012)."))
+
+    add(Material("SiO2", "Silicon Dioxide", "SiO2",
+                 "dielectric", "amorphous",
+                 density_g_cm3=2.20, stoich=[("Si", 1), ("O", 2)],
+                 notes="Amorphous silicon dioxide. Standard density for thermal/interfacial oxide and BOX in FinFETs. "
+                       "Relaxation via MLIP will optimize the disordered Si-O bond network at the interfaces."))
+
 
 
     return M
