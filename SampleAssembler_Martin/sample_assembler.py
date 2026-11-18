@@ -251,6 +251,7 @@ class MainWindow(QMainWindow):
         self.resize(1320, 860)
         self.fills = []
         self.cad_components = {}
+        self.cad_original_components = {}
         self.cad_file_path = None
         self.selected_cad_component = None
         self.opts = WriterOptions()
@@ -397,6 +398,22 @@ class MainWindow(QMainWindow):
         self.cad_component_note.setProperty("role", "hint")
         self.cad_component_note.setWordWrap(True)
         step_layout.addWidget(self.cad_component_note)
+
+        rotation_row = QGridLayout()
+        self.step_rotation_x = _dspin(0.0, -360.0, 360.0, 1.0, 2)
+        self.step_rotation_y = _dspin(0.0, -360.0, 360.0, 1.0, 2)
+        self.step_rotation_z = _dspin(0.0, -360.0, 360.0, 1.0, 2)
+        rotation_row.addWidget(QLabel("X (deg)"), 0, 0)
+        rotation_row.addWidget(self.step_rotation_x, 1, 0)
+        rotation_row.addWidget(QLabel("Y (deg)"), 0, 1)
+        rotation_row.addWidget(self.step_rotation_y, 1, 1)
+        rotation_row.addWidget(QLabel("Z (deg)"), 0, 2)
+        rotation_row.addWidget(self.step_rotation_z, 1, 2)
+        step_layout.addLayout(rotation_row)
+
+        self.rotate_step_btn = make_button("Rotate", "primary")
+        self.rotate_step_btn.clicked.connect(self._rotate_cad_component)
+        step_layout.addWidget(self.rotate_step_btn)
         v.addWidget(step_group)
 
         # Primitive shape source
@@ -447,6 +464,10 @@ class MainWindow(QMainWindow):
         self.cad_component_combo.setEnabled(use_step)
         self.cad_component_note.setEnabled(use_step)
         self.import_step_btn.setEnabled(use_step)
+        self.rotate_step_btn.setEnabled(use_step)
+        self.step_rotation_x.setEnabled(use_step)
+        self.step_rotation_y.setEnabled(use_step)
+        self.step_rotation_z.setEnabled(use_step)
         self.shape_combo.setEnabled(not use_step)
         self.shape_stack.setEnabled(not use_step)
 
@@ -467,7 +488,11 @@ class MainWindow(QMainWindow):
             return
 
         self.cad_file_path = path
-        self.cad_components = components
+        self.cad_components = dict(components)
+        self.cad_original_components = dict(components)
+        self.step_rotation_x.setValue(0.0)
+        self.step_rotation_y.setValue(0.0)
+        self.step_rotation_z.setValue(0.0)
         self.cad_component_combo.blockSignals(True)
         self.cad_component_combo.clear()
         self.cad_component_combo.addItems(list(components))
@@ -476,6 +501,51 @@ class MainWindow(QMainWindow):
         self._on_cad_component_changed(0)
         self._log(f"Imported {len(components)} STEP component(s): {os.path.basename(path)}")
         self._refresh()
+
+    def _rotate_cad_component(self):
+        name = self.cad_component_combo.currentText()
+        if not name or name not in self.cad_original_components:
+            QMessageBox.warning(self, "STEP rotation", "Import a STEP file and select a component first.")
+            return
+
+        try:
+            from build123d import Axis, Vector
+
+            origin = Vector(0.0, 0.0, 0.0)
+            x_axis = Axis(origin, Vector(1.0, 0.0, 0.0))
+            y_axis = Axis(origin, Vector(0.0, 1.0, 0.0))
+            z_axis = Axis(origin, Vector(0.0, 0.0, 1.0))
+
+            rotated = self.cad_original_components[name]
+            rx = self.step_rotation_x.value()
+            ry = self.step_rotation_y.value()
+            rz = self.step_rotation_z.value()
+            if rx:
+                rotated = rotated.rotate(x_axis, rx)
+            if ry:
+                rotated = rotated.rotate(y_axis, ry)
+            if rz:
+                rotated = rotated.rotate(z_axis, rz)
+
+            self.cad_components[name] = rotated
+            self.selected_cad_component = rotated
+
+            # Keep already-added fills synchronized with the transformed solid.
+            for fill in self.fills:
+                if isinstance(fill.region, ImportedRegion) and fill.region.name == name:
+                    fill.region.shape = rotated
+
+            bounds = rotated.bounding_box()
+            self.cad_component_note.setText(
+                f"{name} — rotated X:{rx:g}°, Y:{ry:g}°, Z:{rz:g}°\n"
+                f"Bounds: X[{bounds.min.X:g}, {bounds.max.X:g}]  "
+                f"Y[{bounds.min.Y:g}, {bounds.max.Y:g}]  "
+                f"Z[{bounds.min.Z:g}, {bounds.max.Z:g}] Å"
+            )
+            self._log(f"Rotated STEP component '{name}' by X {rx:g}°, Y {ry:g}°, Z {rz:g}°")
+            self._refresh()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "STEP rotation failed", str(exc))
 
     def _on_cad_component_changed(self, index):
         if index < 0 or index >= self.cad_component_combo.count():
